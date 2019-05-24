@@ -4,50 +4,538 @@ author: "Bartłomiej Kalata"
 date: "19 maja 2019"
 output: html_document
 ---
+# Opis projektu
 
-```{r labrarys, message=FALSE, warning=FALSE}
-#załadowanie bibliotek
+Celem projektu jest stworzenie funkcji symulującej próbki z rozkładów mieszanych oraz analiza mocy testów zgodności oraz rangowych dla próbek otrzymanych w ten sposób.
+
+Analiza mocy tych testów opierać się będzie o następujące parametry:
+
++ Długości próby.
++ Prawdopodobieństwo wylosowania liczby z pierwszego rozkładu.
++ Poziomu istotności wybranego testu.
+
+
+W projekcie zostaną użyte trzy testy badające normalność rozkładu:
+
++ Jarque-Bera
++ Shapiro-Wilka
++ Lillieforsa
++ Andresona-Darlinga
++ Wilcoxona
+
+***
+
+##Test Jarque-Bera
+
+W statystyce test ten sprawdza przy pomocy statystyki Jarque-Bera normalność rozkładu.
+Statystyka ta jest wspólna dla współczynnika skośności oraz dla kurtozy.
+Wyniki z niej są zawsze nieujemne. Jeżeli są one dalekie od zera, sygnalizuje to że dane nie mają normalnego rozkładu. Najczęsciej jest test ten używany jest dla dużej próbki. Hipotezą zerową w tym teście jest stwierdzenie, że próba pochodzi z rozkładu normalnego.
+
+
+## Test Shapiro-Wilka
+Test Shapiro-Wilka sprawdza w hipotezie zerowej czy próbka *x1,.....,xn* pochodzi z rozkłądu normalnego. Jest to preferowany test na normalność rozkładu ze względu na jego moc w porównaniu z innymi alternatywnymi testami. Test ten bazuje na spostrzeżeniu, iż analizując dopasowanie próbnego zbioru danych do rozkładu normalnego jest podobne do zadania liniowej regresji - linia diagonalna jest linią idealnego dopasowania, zaś wszystkie odchylenia od niej są podobne do residuów w zadaniu regresji. I właśnie analizując skalę tych odchyleń można określić jakość dopasowania. Dla dużej próbki nie będzie więc on bardzo wiarygodnym testem.
+
+***
+##Test Lilieforsa
+ 
+Jest to modynikacja testu Kołmogorowa-Smirnowa, pozwalająca na badanie zgodności rozkładu
+populacji z całą rodziną rozkładów normalnych, która nie wymaga zadania parametrów rozkładu
+normalnego.Statystyka testowa $D$ wyznaczana jest na podstawie tej samej formuły, z której korzysta test Kołmogorova-Smirnova, ale podlega rozkładowi Lillieforsa. 
+
+***
+
+##Test Andersona-Darlinga 
+
+Jeden z testów statystycznych zgodności rozkładu z zadanym rozkładem wzorcowym. Zwykle stosuje się go do sprawdzenia zgodności z rozkładem normalnym. Jest modyfikacją testu Craméra-von Misesa dokonaną w celu poprawy jego czułości w „ogonach” testowanego rozkładu. 
+
+***
+
+##Test Wilcoxona 
+Dla par obserwacji to nieparametryczna alternatywa dla testu t-Studenta dla przypadku dwóch równolicznych próbek dających się połączyć w pary. Często używa się tego testu do porównywania danych zebranych przed i po eksperymencie w celu zbadania, czy nastąpiła istotna statystycznie zmiana.
+
+***
+```{r labrarys,echo=FALSE,message=FALSE, warning=FALSE}
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(tseries)
+library(normtest)
 library(nortest)
 ```
 
+##Zadanie 1 -  ___Funkcja rmix___:
 
+###Dane do projektu:
 
-```{r}
+####Funkcja ___rmix___ przyjmuje następujące parametry:
+
++ $par_1$ - wektor parametrów pierwszego rozkładu
++ $par_2$- wektor parametrów drugiego rozkładu
++ $family_1$ - pierwszy typ rozkładu
++ $family_2$ -  drugi typ rozkładu
++ $n$- długość próby
++ $p$- prawdopodobieństwo pierwszego rozkładu 
+
+####Przykładowe typy rozkładó dla parametrów ___family___:
+
++ $norm$ dla rozkładu normalnego
++ $t$ dla rozkładu t-Studenta
++ $binom$ dla rozkładu dwumianowego
++ $pois$ dla rozkładu Poissona
+
+#### Funkcja dostępna również w pliku ___Kalata_rmix.R___
+
+###Algorytm funkcji rmix:
+```{r  warning=FALSE}
 rmix<- function(n,family_1,par_1,family_2,par_2,p){
   #każdy indeks w próbce o długości n bedzie rozlosowany z prawdopodobieństwem p
   index<-sample(0:1,replace = T,prob = c(p,1-p),size = n)
   
- 
+  
   #obliczenie długość wektorów
   length_1<- sum(length(which(index==0)))
   length_2<-sum(length(which(index==1)))
   
   #stworzenie nazwy funkcji tworzącej próbke 
-   function_1<- get(paste('r',family_1, sep = ""))
-   function_2<- get(paste('r',family_2, sep = ""))
+  function_1<- get(paste('r',family_1, sep = ""))
+  function_2<- get(paste('r',family_2, sep = ""))
   
   if(length(par_1)==1){
     sample_1<-function_1(length_1,par_1[1])
     
   }
-   else if(length(par_1)==2){
-     sample_1<-function_1(length_1,par_1[1],par_1[2])
-   }
-   
-   if(length(par_2)==1){
+  else if(length(par_1)==2){
+    sample_1<-function_1(length_1,par_1[1],par_1[2])
+  }
+  
+  if(length(par_2)==1){
     sample_2<-function_2(length_2,par_2[1])
     
   }
-   else if(length(par_2)==2){
-     sample_2<-function_2(length_2,par_2[1],par_2[2])
-   }
+  else if(length(par_2)==2){
+    sample_2<-function_2(length_2,par_2[1],par_2[2])
+  }
   
   c(sample_1,sample_2)
 }
 ```
 
 
+
++  Na początku tworzymy wektor z losowymi liczbami pochodzącymi z rozkładów o parametrach podanych powyżej.
+
++  Następnie sprawdzamy dla jakiego indeksu w wektorze został przypisany dany rozkład, dzięki czemu możemy obliczyć długości tych wektorów dla każdego z rozkładu.
+
++  Tworzymy nazwę funkcji tworzącej próbkę poprzez dodanie $r$ do poarametru przypisanego do ___family___
+
++  Dla rodzaju parametru (w zależności od długości wektora zmiennych) dopasowywujemy ___par___ do odpowiedniej funkcji.
+
++  Wynikiem funkcji ___rmix___ jest n-elementowy wektor, w którym każda liczba z prawdopodobieństwem $p$ pochodzi z rozkładu typu $family_1$ o parametrach $par_1$, a z prawdopodobieństwem $(1-p)$ pochodzi z rozkładu typu $family_2$ o parametrach $par_2$.
+
+
+#Zadanie 2 - ___Analiza mocy testów zgodności w zależności od parametrów___
+
+W tym zadaniu postaramy się przeanalizować moce testów zgodności
+dla mieszanki dwóch rozkładów normalnych przy hipotezie zerowej o rozkładzie normalnym, przy wykorzystaniuu funkjci rmix. 
+
+***
+
+##Hipotezy:
+
++ ___Zmiana długości próby:___  
+H0: wraz ze zwiększaniem długości próby rośnie moc testu  
+H1: wraz ze zwiększaniem długości próby maleje moc testu  
+
++ ___Zmiana poziomu prawdopodobieństwa wystąpienia zmiennych z 1 rozkładu:___  
+H0: wraz ze zwiększaniem prawdopodobieństwa rośnie moc testu  
+H1: wraz ze zwiększaniem prawdopodobieństwa maleje moc testu
+
++ ___Zmiana wielkości pierwszego parametru wektora par_1 oraz par_2:___  
+H0: wraz ze zwiększaniem wielkości par_1[1] oraz par_2[1] rośnie moc testu  
+H1: wraz ze zwiększaniem wielkości par_1[1] oraz par_2[1] maleje moc testu 
+
+
++ ___Zmiana wielkości drugiego parametru wektora par_1 oraz par_2:___  
+H0: wraz ze zwiększaniem wielkości par_1[2] oraz par_2[2] rośnie moc testu  
+H1: wraz ze zwiększaniem wielkości par_1[2] oraz par_2[2] maleje moc testu 
+
+***
+
+W wyniku przeprowadzonej analizy spodziewamy się przyjęcia za prawdziwą hipotezę zerową w każdym z podanych przypadków.
+
+### a) ___Zmiana długości próby oraz zmiana poziomu prawdopodobieństwa wystąpienia zmiennych z 1 rozkładu___ 
+
+Parametry:
+
+```{r}
+# liczebnosć próbki
+n<-seq(10,300,by=15)
+#typ rozkladu 1
+family_1 <- "norm"
+par_1<-c(6,5)
+#typ rozkladu 2
+family_2 <- "norm"
+par_2<-c(11,6)
+#liczba symulacji
+N<-100
+#prawdopodobienstwo
+p<-c(.1,.3,.5,.9)
+#poziom istotności
+alpha<-0.05
+#wektor z nazwami testow normalnosci
+name<- c("JB","SW","L","AD")
+#ustawienie ziarna generatora 
+set.seed(35)
+
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+DANEMOCE_NP<-expand.grid(n=n,p=p,name=name)
+```
+Dla każdego parametru z pomocą odpowiedniej funkcji (shapiro.test, ad.test, jarque.bera.test, lillie.test) obliczana jest moc testów i za pomocą __sapply__ dołączana do wektora __MOCE_NP__
+
+### Kod funkcji:
+```{r}
+
+#funkcja która sprawdza moce testóW normalnosci przy zmianie n oraz p 
+
+MOCE_NP <- sapply(1:nrow(DANEMOCE_NP),
+                 function(i){
+                   n <- DANEMOCE_NP[i, 1]
+                   p <- DANEMOCE_NP[i, 2]
+                   name<-DANEMOCE_NP[i,3]
+                   
+                   
+                   p_vector <- sapply(rep(n, N), function(x){
+                     sample <- rmix(n, family_1, par_1,family_2 , par_2, p)
+                     
+                     if (name == "SW"){
+                       return <- shapiro.test(sample)$p.value
+                     }
+                     else if (name == "JB"){
+                      return <- jarque.bera.test(sample)$p.value
+                     }   
+                     else if (name == "L"){
+                      return <-lillie.test(sample)$p.value
+                     } 
+                      else if (name == "AD"){
+                      return <- ad.test(sample)$p.value
+                     }  
+                     return
+                   })
+                   
+                   mean(p_vector < alpha)
+                 })
+```
+Kod ten będzie zastosowany również do kolejnych wizualizacji, przy zmianie poszczególnych parametrów wpływających na moc testów normalności.
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+
+DANEMOCE_NP<-bind_cols(DANEMOCE_NP,moce=MOCE_NP)
+```
+
+
+
+###Wizualizacja wyników:
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+
+ggplot(DANEMOCE_NP,aes(x=n,y=moce,color=factor(name)))+labs(title = "Zmiana mocy w zależności od n i p", x = "Długość próbki", y = "Moc" , color= "Testy")+ geom_smooth(se=F)+facet_wrap(~ p, nrow = 2)
+
+```
+
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+#dlugosc proby
+n <- c(20,60,90,200)
+#prawdopodobienstwo pierwszego rozk?adu
+p <- 0.58
+
+#zmienna mean w  elemencie par_1 zmienne
+
+mean_par_1 <- seq(10, 40, by = 1)
+#parametry2
+par_2 <- c(25, 2)
+```
+
+
+
+
+### b)  ___Zmiana wielkości pierwszego parametru wektora par_1 oraz par_2___  
+
+
+```{r  echo=FALSE,message=FALSE, warning=FALSE}
+DANE_MEAN_PAR_1<- expand.grid(n = n, mean = mean_par_1, name = name)
+
+set.seed(20)
+MOCE_MEAN_PAR_1 <- sapply(1:nrow(DANE_MEAN_PAR_1),
+                 function(i){
+                   n <- DANE_MEAN_PAR_1[i, 1]
+                   par_1_mean <- DANE_MEAN_PAR_1[i, 2]
+                   name <- DANE_MEAN_PAR_1[i, 3]
+                   
+                   p_vector <- sapply(rep(n, N), function(x){
+                     sample <- rmix(n, family_1, c(par_1_mean,1), family_2, par_2, p)
+                     
+                     if(name == "SW"){
+                       return <- shapiro.test(sample)$p.value
+                     } else if (name == "JB"){
+                       return <- jarque.bera.test(sample)$p.value
+                     }
+                      else if (name == "L"){
+                      return <-lillie.test(sample)$p.value
+                     } 
+                      else if (name == "AD"){
+                      return <- ad.test(sample)$p.value
+                     }  
+                     return
+                   })
+                   mean(p_vector < alpha)
+                 })
+
+DANE_MEAN_PAR_1 <- bind_cols(DANE_MEAN_PAR_1, power = MOCE_MEAN_PAR_1 )
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+ ggplot(DANE_MEAN_PAR_1,aes(x = mean, y = power, color = name)) +
+  labs(title = "Zmiana mocy w zależności od pierwszego parametru par_1[1]", x = "Wartosc par1[1]", y = "Moc",color="Testy") +
+  geom_smooth(method = loess,formula = 'y~x', se=F) + 
+  facet_wrap(~ n, nrow = 2)
+```
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+#dlugosc proby
+n <- c(20,60,90,200)
+#prawdopodobienstwo pierwszego rozkładu
+p <- 0.34
+#zmienna mean w  elemencie par_2 zmienne
+mean_par_2 <- seq(10, 40, by = 1)
+#parametry2
+par_1 <- c(25, 2)
+```
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+DANE_MEAN_PAR_2<- expand.grid(n = n, mean = mean_par_2, name = name)
+
+set.seed(20)
+MOCE_MEAN_PAR_2 <- sapply(1:nrow(DANE_MEAN_PAR_2),
+                 function(i){
+                   n <- DANE_MEAN_PAR_2[i, 1]
+                   par_2_mean <- DANE_MEAN_PAR_2[i, 2]
+                   name <- DANE_MEAN_PAR_2[i, 3]
+                   
+                   p_vector <- sapply(rep(n, N), function(x){
+                     sample <- rmix(n, family_1,par_1, family_2, c(par_2_mean,4), p)
+                     
+                     if(name == "SW"){
+                       return <- shapiro.test(sample)$p.value
+                     } else if (name == "JB"){
+                       return <- jarque.bera.test(sample)$p.value
+                     }else if (name == "L"){
+                      return <-lillie.test(sample)$p.value
+                     } 
+                      else if (name == "AD"){
+                      return <- ad.test(sample)$p.value
+                     }  
+                     return
+                   })
+                   mean(p_vector < alpha)
+                 })
+
+DANE_MEAN_PAR_2 <- bind_cols(DANE_MEAN_PAR_2, power = MOCE_MEAN_PAR_2 )
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(DANE_MEAN_PAR_2,aes(x=mean,y=power,color=name))+labs(title = "Zmiana mocy w zależności od pierwszego parametru par_2[1]", x = "Wartosc par2[1]", y = "Moc",color="Testy")+ geom_smooth(method = loess,formula = 'y~x', se=F) +   facet_wrap(~ n, nrow = 2)+ylim(0,1)
+```
+
+
+
+
+
+
+### c) ___Zmiana wielkości drugiego parametru wektora par_1 oraz par_2:___  
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+#dlugosc proby
+n <- c(20,60,90,200)
+#prawdopodobienstwo pierwszego rozk?adu
+p <- 0.26
+#zmienna sd w  elemencie par_1 zmienne
+sd_par_1 <- seq(0, 30, by = 1)
+#parametry2
+par_2 <- c(19, 15)
+```
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+DANE_SD_PAR_1<-expand.grid(n=n,p=p,sd=sd_par_1,name=name)
+```
+
+
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+MOCE_SD_PAR_1<- sapply(1:nrow(DANE_SD_PAR_1),
+                 function(i){
+                   n <- DANE_SD_PAR_1[i, 1]
+                   par_1_sd <- DANE_SD_PAR_1[i, 3]
+                   name <- DANE_SD_PAR_1[i, 4]
+                   
+                   p_vector <- sapply(rep(n, N), function(x){
+                     sample <- rmix(n, family_1, c(15, par_1_sd), family_2, par_2, p)
+                     
+                     if(name == "SW"){
+                       return <- shapiro.test(sample)$p.value
+                     } else if (name == "JB"){
+                       return <- jarque.bera.test(sample)$p.value
+                     } else if (name == "L"){
+                      return <-lillie.test(sample)$p.value
+                     } 
+                      else if (name == "AD"){
+                      return <- ad.test(sample)$p.value
+                     }  
+                     return
+                   })
+                   mean(p_vector < alpha)
+                 })
+DANE_SD_PAR_1<-bind_cols(DANE_SD_PAR_1,power=MOCE_SD_PAR_1)
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(DANE_SD_PAR_1,aes(x=sd,y=power,color=factor(name)))+ geom_smooth(method = loess,formula = 'y~x', se=F) + labs(title = "Zmiana mocy w zależności od drugiego parametru par_1[2]", x = "Wartosc par1[2]", y = "Moc",color="Testy")+ facet_wrap(~ n, nrow = 2)+ylim(0,1)
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+#dlugosc proby
+n <- c(20,60,90,200)
+#prawdopodobienstwo pierwszego rozk?adu
+p <- 0.59
+#zmienna sd w  elemencie par_1 zmienne
+sd_par_2 <- seq(0, 30, by = 1)
+#parametry2
+par_1 <- c(19, 15)
+```
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+DANE_SD_PAR_2<-expand.grid(n=n,p=p,sd=sd_par_2,name=name)
+```
+
+
+
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+MOCE_SD_PAR_2<- sapply(1:nrow(DANE_SD_PAR_2),
+                 function(i){
+                   n <- DANE_SD_PAR_2[i, 1]
+                   par_2_sd <- DANE_SD_PAR_2[i, 3]
+                   name <- DANE_SD_PAR_2[i, 4]
+                   
+                   p_vector <- sapply(rep(n, N), function(x){
+                     sample <- rmix(n, family_1, par_1 , family_2, c(15, par_2_sd), p)
+                     
+                     if(name == "SW"){
+                       return <- shapiro.test(sample)$p.value
+                     } else if (name == "JB"){
+                       return <- jarque.bera.test(sample)$p.value
+                     } else if (name == "L"){
+                      return <-lillie.test(sample)$p.value
+                     } 
+                      else if (name == "AD"){
+                      return <- ad.test(sample)$p.value
+                     }  
+                     return
+                   })
+                   mean(p_vector < alpha)
+                 })
+DANE_SD_PAR_2<-bind_cols(DANE_SD_PAR_2,power=MOCE_SD_PAR_2)
+```
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(DANE_SD_PAR_2,aes(x=sd,y=power,color=factor(name)))+ geom_smooth(method = loess,formula = 'y~x', se=F) + labs(title = "Zmiana mocy w zależności od drugiego parametru par_2[2]", x = "Wartosc par2[2]", y = "Moc",color="Testy")+ facet_wrap(~ n, nrow = 2)+ylim(0,1)
+```
+
+#Interpretacja i wnioski - ZADANIE 2:
+
+## a)  ___Zmiana długości próby oraz zmiana poziomu prawdopodobieństwa wystąpienia zmiennych z 1 rozkładu___ 
+
+Z wykresów możemy wyciągnąć następujące wnioski:
+w obu badanych przypadkach tj. w zależności od $n$ i od $p$ nie mamy podstaw do odrzucenia hipotezy zerowej. Oznacza to, że wraz ze wzrostem długości próby oraz prawdopodobieństwem wylosowanie liczby z pierwszego rozkładu moc testu również wzrasta.Przy zmianie tych parametrów moce testów ulegają zmianie co powoduje trudność w określeniu któy z nich jest najmocniejszym testem zgodności.
+
+##b) ___Zmiana wielkości pierwszego parametru wektora par_1 oraz par_2___ 
+
+Z wykresów możemy wyciągnąć następujące wnioski:
+moc testów maleje tylko w miejscu, gdzie wartości oczekiwane badanego przez nas rozkładu zbliżają się do wartości wartości oczekiwanych rozkładu drugiego. Spowodowane jest to faktem, że badane przez nas rozkłady w takiej sytuacji nie różnią się od siebie znacząco. Zgodnie z przewidywaniami nie ma podstaw do odrzucenia hipotezy zerowej.
+
+## c) ___Zmiana wielkości drugiego parametru wektora par_1 oraz par_2:___  
+
+Z wykresów możemy wyciągnąć następujące wnioski:
+nie ma podstaw do odrzucenia hipotezy H0, gdyż zmiana drugiego parametru  wektorów  powoduje stopniowy jedynie spadek w miejscu gdzie odchylenie standardowe jednego i dugiego rozkładu bliża się do wartości. Sytuacja bardzo podobna jak gdy zmieniliśmy pierwszy parametr w rozkładach.
+
+
+#Zadanie 3- ___Z wykorzystaniem funkcji rmix przeanalizowanie mocy testu Wilcoxona dla mieszanki rozkładów Poissona przy hipotezie zerowej o rozkładzie Poissona.___
+
+Podczas przeprowadzania analizy zmienne $p , par_2 , n$ będą parametrami dzięki którym stwierdzimy w jaki sposób moc testu Wilcoxona będzie się zmieniać.
+
+Dane potrzebne do zadania:
+```{r}
+#ilosc symulacji
+N <- 100
+#dlugo?ci pr?by
+n <- seq(40, 100, by = 15)
+#typ rozk?adu 1
+family_1 <- "pois"
+par_1 <- c(13)
+#typ rozkladu 2
+family_2 <- "pois"
+#parametr - lambda 
+par_2 <- c(1:25) 
+#prawdopodobienstwa 
+p <- c(.40, .55, .75)
+```
+```{r}
+DANE_WIL<- expand.grid(par_2 = par_2, p = p, n = n)
+```
+
+Algorytm dzięki któremu przeprowadzam analizę:
+
+Z ramki danych ___DANE_WIL___ pobieram każdy z parametrów a następnie tworzę dwie próbki jedną z funkcji ___rmix___ a drógą z rozkładu Poissona. Następnie przy każdej iteracji funkcji ___sample___ sprawdzam moc testu Wilcoxona funkcją ___wilcox.test___ 
+
+
+
+```{r warning=FALSE}
+
+MOCE_WIL<- sapply(1:nrow(DANE_WIL),
+                 function(i){
+                   par_2 <- DANE_WIL[i, 1]
+                   p <- DANE_WIL[ i , 2]
+                   n <- DANE_WIL[i, 3]
+                   
+                   p_vector <- sapply(rep(par_2, N), function(x){
+                     sample_1 <- rmix(n, family_1, par_1, family_2, par_2, p)
+                     sample_2 <- rpois(n, par_1[1]) 
+                     wilcox.test(sample_1, sample_2, paired = T)$p.value 
+                    })
+                   mean(p_vector < alpha)
+                 })
+DANE_WIL<-bind_cols(DANE_WIL,power=MOCE_WIL)
+```
+
+
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+ggplot(DANE_WIL,aes(x=par_2,y=power,color=factor(n)))+geom_smooth(se=F)+facet_wrap(~p,nrow = 3)+labs(title = "Zmiana mocy w zależności od drugiego parametrów n i p i  par_2", x = "Wartosc par_2", y = "Moc",color="Długosć próby")+ylim(0,1)
+```
+
+
+###Wnioski
+
+
+Z wykresów możemy wyciągnąć następujące wnioski:
+Im długości próby jest większa to wtedy, rośnie moc testu.
+Gdy prawdopodobieństwo wylosowania liczby z pierwszego rozkładu rośnie to wtedy  wtedy moc testu maleje. 
+Podczas zmiany parametru $par_2$ możemy zauważyć, że moc testu spada gdy wartość tego parametru zbliża się do wartości
+$par_1$. Wtedy próbki które ze sobą porównujemy stają się do siebie bardzo podobne.
